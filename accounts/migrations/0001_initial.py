@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                 ('role', models.CharField(choices=[('Customer', 'Customer'), ('HotelManager', 'Hotel Manager'), ('Admin', 'Admin')], default='Customer', max_length=15)),
                 ('is_active', models.BooleanField(default=True)),
                 ('is_staff', models.BooleanField(default=False)),
-                ('created_datetime', models.DateTimeField(auto_now_add=True)),
+                ('create_datetime', models.DateTimeField(auto_now_add=True)),
                 ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
                 ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
             ],
