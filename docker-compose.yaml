@@ -1,33 +1,29 @@
+version: "3.8"
+
 services:
-  version: "3.8"
-services:
-  environment:
-    - SERVER_URL=https://bookit.darkube.app
   postgres:
     image: postgres:15.1
     ports:
-      - 7887:5432
+      - "7887:5432"
     env_file: .env
     volumes:
-      - $HOME/docker/volumes/Abarcode/postgres:/var/lib/postgresql/data
+      - $HOME/docker/volumes/Bookit/postgres:/var/lib/postgresql/data
+    networks:
+      - app-network
 
-    depends_on:
-      - web
-    web:
+  web:
     build: .
     env_file: .env
     command: >
       sh -c "python manage.py collectstatic --noinput &&
-      python manage.py migrate &&
-      gunicorn -b 0.0.0.0:8000 Bookit.wsgi"
+             python manage.py migrate &&
+             gunicorn -b 0.0.0.0:8000 Bookit.wsgi"
     depends_on:
       - postgres
+    ports:
+      - "8000:8000"
     networks:
       - app-network
 
-volumes:
-  static_volume:
-  media_volume:
 networks:
   app-network:
-

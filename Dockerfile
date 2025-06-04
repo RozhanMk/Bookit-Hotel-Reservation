@@ -1,18 +1,16 @@
-FROM python:3.10
+# Dockerfile
 
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY requirements.txt requirements.txt
-
-RUN pip install --upgrade pip
-RUN pip install psycopg2-binary
-RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-#RUN mkdir -p /app/static /app/media
-
-ENTRYPOINT ["/bin/sh", "-c" , "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn -b 0.0.0.0:8000 bookit.wsgi"]
-
+# Run collectstatic and migrate via CMD or entrypoint if needed
+CMD gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000
