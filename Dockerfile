@@ -10,8 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Collect static files, run migrations, then start server
-CMD sh -c "
-    python manage.py collectstatic --noinput &&
-    python manage.py migrate &&
-    gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000"
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000"]
