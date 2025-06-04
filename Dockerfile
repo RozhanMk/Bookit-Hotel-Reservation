@@ -1,5 +1,3 @@
-# Dockerfile
-
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -12,5 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run collectstatic and migrate via CMD or entrypoint if needed
-CMD gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000
+# Collect static files, run migrations, then start server
+CMD sh -c "
+    python manage.py collectstatic --noinput &&
+    python manage.py migrate &&
+    gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000"
