@@ -1,0 +1,53 @@
+documantioan -> drf-spectacular
+		why?
+		.Automatic Coverage - Like ViewSet's built-in CRUD actions, drf-spectacular auto-documents endpoints, schemas, and methods—zero config for standard APIs.
+
+                .Seamless JWT Integration - Automatically adds auth schemes (JWT/OAuth2) to Swagger, just as ViewSet enforces authentication_classes globally.
+
+		.DRY & Efficient - Infers docs from serializers/models (no boilerplate), mirroring ViewSet's minimal-code philosophy.
+
+		.Modern & Future-Proof - Uses OpenAPI 3.0 (vs drf-yasg's outdated 2.0), aligning with REST best .practices like ViewSet does.
+
+		.Dev-Friendly - Faster, dual UI (Swagger + Redoc), and plug-and-play—just like ViewSet’s "batteries-included" design.
+
+
+views -> using viewset is best choice
+	Why?
+	.Covers all default actions (list, retrieve, create, etc.).
+
+	.Automatically applies JWT auth to every endpoint.
+
+	.Clean and DRY (no manual method overrides).
+
+
+models -> inherits from base model in core directory which is abstract and has is create and modefied datetime
+	   and flag is deleted and is_active
+
+
+urls -> has been writen before and thier name must not be changed
+
+
+manager -> inherits from base manager in core directory
+            **If needed to override the base manager you should define new class manager for your model
+            on manager.py of related app and this manager must inherits from base manager and
+            the object field on your model must be updated
+
+
+test -> write unit test using APITestCase from rest_framework.test
+
+
+serializers -> using serializers.ModelSerializer from rest_framework
+
+
+documents -> each app has document about its endpoints named "app_name-endpoints"
+            its structure must be like :
+            1. "number of endpoint"
+            url = "app-api/create"
+            method = "post/patch/delete/..."
+            description = "user can create new post"
+            body = "if user must send data in json needed fields must be written here"
+            possible responses = all responses user may get with http status code and response json data
+            "for writing possible responses in tests.py you can consider all possible responses
+             in each unit test and get you response there and add them in your document
+             for example def test_user_not_found or def test_user_sends_wrong_info
+             "
