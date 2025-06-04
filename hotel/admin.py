@@ -39,7 +39,7 @@ class HotelAdmin(admin.ModelAdmin):
 
     def image_tag(self, obj):
         if obj.image:
-            url = f'http://{SERVER_URL}{MEDIA_URL}{obj.image.name}'
+            url = f'{SERVER_URL}{MEDIA_URL}{obj.image.name}'
             return format_html(
                 '<a href="{}" target="_blank"><img src="{}" width="80" height="85" /></a>',
                 url,
@@ -49,7 +49,7 @@ class HotelAdmin(admin.ModelAdmin):
 
     def hotel_license_tag(self, obj):
         if obj.hotel_license:
-            url = f'http://{SERVER_URL}{MEDIA_URL}{obj.hotel_license.name}'
+            url = f'{SERVER_URL}{MEDIA_URL}{obj.hotel_license.name}'
             return format_html(
                 '<a href="{}" target="_blank"><img src="{}" width="80" height="85" /></a>',
                 url,
