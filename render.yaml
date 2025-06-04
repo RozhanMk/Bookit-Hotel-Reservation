@@ -1,18 +1,27 @@
 services:
   - type: web
-    name: bookit-backend
+    name: bookit-web
     env: docker
     plan: free
-    region: oregon
     dockerfilePath: ./Dockerfile
+    buildCommand: ""
+    startCommand: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn Bookit.wsgi:application --bind 0.0.0.0:8000"
     envVars:
+      - fromEnvFile: true  
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com,localhost,127.0.0.1,::1
       - key: DATABASE_URL
         fromDatabase:
           name: bookit-db
           property: connectionString
-      - key: SERVER_URL
-        value: https://bookit.onrender.com
 
-  - type: postgres
-    name: bookit-db
+databases:
+  - name: bookit-db
     plan: free
