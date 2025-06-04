@@ -32,9 +32,15 @@ DEBUG = os.getenv("DEBUG", default=0)
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS").split(",")
 
-CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS").split()
+CSRF_TRUSTED_ORIGINS = [
+    "https://bookit-web.onrender.com",
+    "https://www.bookit-web.onrender.com",
+]
 
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS").split()
+CORS_ALLOWED_ORIGINS = [
+    "https://bookit-web.onrender.com",
+    "https://www.bookit-web.onrender.com",
+]
 
 AUTH_USER_MODEL = 'accounts.User'
 
