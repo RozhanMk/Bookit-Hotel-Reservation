@@ -7,7 +7,7 @@ services:
       - "7887:5432"
     env_file: .env
     volumes:
-      - $HOME/docker/volumes/Bookit/postgres:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
 
@@ -15,7 +15,8 @@ services:
     build: .
     env_file: .env
     command: >
-      sh -c "python manage.py makemigrations --noinput &&
+      sh -c "sleep 5 &&
+             python manage.py makemigrations &&
              python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn -b 0.0.0.0:8000 bookit.wsgi"
@@ -25,6 +26,8 @@ services:
       - "8000:8000"
     networks:
       - app-network
+    volumes:
+      - .:/app
 
 networks:
   app-network:
