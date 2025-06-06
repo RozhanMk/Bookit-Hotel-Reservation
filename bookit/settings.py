@@ -103,9 +103,7 @@ WSGI_APPLICATION = 'bookit.wsgi.application'
 # Database
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL'),
-        conn_max_age=600,       # optional: persistent connections
-        ssl_require=False,      # set True if your PG server uses SSL
+        default=config('DATABASE_URL')
     )
 }
 
