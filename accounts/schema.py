@@ -1,12 +1,13 @@
+# accounts/schema.py
 import graphene
-from graphene_django import DjangoObjectType
 from accounts.models import User, Customer
-from accounts.serializers import CustomerRegisterSerializer
+from accounts.serializers import UserSerializer, CustomerSerializer
+from graphene_django.types import DjangoObjectType
 
 class UserType(DjangoObjectType):
     class Meta:
         model = User
-        fields = ("id", "email", "name", "last_name", "role")
+        fields = ['id', 'email', 'name', 'last_name', 'role']
 
 class RegisterCustomer(graphene.Mutation):
     class Arguments:
@@ -19,18 +20,20 @@ class RegisterCustomer(graphene.Mutation):
     message = graphene.String()
 
     def mutate(self, info, email, name, last_name, password):
-        serializer = CustomerRegisterSerializer(data={
-            "email": email,
-            "name": name,
-            "last_name": last_name,
-            "password": password
-        })
-        if serializer.is_valid():
-            user = serializer.save()
-            Customer.objects.create(user=user)
-            return RegisterCustomer(user=user, message="Customer registered successfully")
-        else:
-            raise Exception(serializer.errors)
+        user_data = {
+            'email': email,
+            'name': name,
+            'last_name': last_name,
+            'password': password,
+            'role': 'Customer'
+        }
 
-class Mutation(graphene.ObjectType):
-    register_customer = RegisterCustomer.Field()
+        user_serializer = UserSerializer(data=user_data)
+        if user_serializer.is_valid():
+            user = user_serializer.save()
+            user.set_password(password)
+            user.save()
+            Customer.objects.create(user=user)
+            return RegisterCustomer(user=user, message="Customer registered successfully.")
+        else:
+            raise Exception(user_serializer.errors)
