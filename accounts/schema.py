@@ -16,11 +16,12 @@ class RegisterHotelManager(graphene.Mutation):
         email = graphene.String(required=True)
         password = graphene.String(required=True)
         name = graphene.String(required=True)
+        last_name = graphene.String(required=True)
         national_code = graphene.String(required=True)
 
     hotel_manager = graphene.Field(HotelManagerType)
 
-    def mutate(self, info, email, password, name, national_code):
-        user = User.objects.create_user(email=email, password=password, name=name, role="HotelManager")
+    def mutate(self, info, email, password, name, last_name, national_code):
+        user = User.objects.create_user(email=email, password=password, name=name, last_name=last_name, role="HotelManager")
         manager = HotelManager.objects.create(user=user, national_code=national_code)
         return RegisterHotelManager(hotel_manager=manager)
