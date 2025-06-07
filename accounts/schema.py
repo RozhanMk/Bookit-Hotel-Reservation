@@ -1,27 +1,36 @@
 import graphene
-from graphene_django.types import DjangoObjectType
-from accounts.models import User
-from hotelManager.models import HotelManager
+from graphene_django import DjangoObjectType
+from accounts.models import User, Customer
+from accounts.serializers import CustomerRegisterSerializer
 
 class UserType(DjangoObjectType):
     class Meta:
         model = User
+        fields = ("id", "email", "name", "last_name", "role")
 
-class HotelManagerType(DjangoObjectType):
-    class Meta:
-        model = HotelManager
-
-class RegisterHotelManager(graphene.Mutation):
+class RegisterCustomer(graphene.Mutation):
     class Arguments:
         email = graphene.String(required=True)
-        password = graphene.String(required=True)
         name = graphene.String(required=True)
         last_name = graphene.String(required=True)
-        national_code = graphene.String(required=True)
+        password = graphene.String(required=True)
 
-    hotel_manager = graphene.Field(HotelManagerType)
+    user = graphene.Field(UserType)
+    message = graphene.String()
 
-    def mutate(self, info, email, password, name, last_name, national_code):
-        user = User.objects.create_user(email=email, password=password, name=name, last_name=last_name, role="HotelManager")
-        manager = HotelManager.objects.create(user=user, national_code=national_code)
-        return RegisterHotelManager(hotel_manager=manager)
+    def mutate(self, info, email, name, last_name, password):
+        serializer = CustomerRegisterSerializer(data={
+            "email": email,
+            "name": name,
+            "last_name": last_name,
+            "password": password
+        })
+        if serializer.is_valid():
+            user = serializer.save()
+            Customer.objects.create(user=user)
+            return RegisterCustomer(user=user, message="Customer registered successfully")
+        else:
+            raise Exception(serializer.errors)
+
+class Mutation(graphene.ObjectType):
+    register_customer = RegisterCustomer.Field()
