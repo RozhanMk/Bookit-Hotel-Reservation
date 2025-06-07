@@ -71,7 +71,10 @@ INSTALLED_APPS = [
 ]
 
 GRAPHENE = {
-    "SCHEMA": "bookit.schema.schema"  
+    "SCHEMA": "bookit.schema.schema",
+    'MIDDLEWARE': [
+        'graphene_file_upload.django.middleware.FileUploadMiddleware',
+    ]
 }
 
 MIDDLEWARE = [

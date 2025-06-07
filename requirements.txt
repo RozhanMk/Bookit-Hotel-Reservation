@@ -12,3 +12,4 @@ django-environ==0.11.2
 environ==1.0
 pycparser==2.21
 graphene-django
+graphene-file-upload
