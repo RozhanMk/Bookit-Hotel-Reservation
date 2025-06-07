@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'drf_yasg',
+    'graphene_django',
     
     # Local
     'accounts',
@@ -68,6 +69,10 @@ INSTALLED_APPS = [
     'room',
     'reservation',
 ]
+
+GRAPHENE = {
+    "SCHEMA": "bookit.schema.schema"  
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
