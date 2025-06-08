@@ -13,3 +13,4 @@ environ==1.0
 pycparser==2.21
 graphene-django
 graphene-file-upload
+django-graphql-jwt

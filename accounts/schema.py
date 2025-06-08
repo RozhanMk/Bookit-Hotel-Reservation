@@ -1,8 +1,10 @@
 # accounts/schema.py
 import graphene
-from accounts.models import User, Customer
+from accounts.models import User, Customer, EmailVerificationCode
 from accounts.serializers import UserSerializer, CustomerSerializer
 from graphene_django.types import DjangoObjectType
+from graphql import GraphQLError
+from django.utils import timezone
 
 class UserType(DjangoObjectType):
     class Meta:
@@ -37,3 +39,30 @@ class RegisterCustomer(graphene.Mutation):
             return RegisterCustomer(user=user, message="Customer registered successfully.")
         else:
             raise Exception(user_serializer.errors)
+
+class VerifyEmail(graphene.Mutation):
+    success = graphene.Boolean()
+    message = graphene.String()
+
+    class Arguments:
+        email = graphene.String(required=True)
+        code = graphene.String(required=True)
+
+    def mutate(self, info, email, code):
+        try:
+            verification = EmailVerificationCode.objects.select_related('user').get(user__email=email)
+        except EmailVerificationCode.DoesNotExist:
+            raise GraphQLError("Verification entry not found for this email.")
+
+        if verification.is_verified:
+            return VerifyEmail(success=False, message="Email is already verified.")
+
+        if verification.code != code:
+            return VerifyEmail(success=False, message="Invalid verification code.")
+
+        if verification.is_expired:
+            return VerifyEmail(success=False, message="Verification code has expired.")
+
+        verification.is_verified = True
+        verification.save()
+        return VerifyEmail(success=True, message="Email verified successfully.")
