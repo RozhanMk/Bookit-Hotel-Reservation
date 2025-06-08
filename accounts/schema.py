@@ -55,36 +55,36 @@ class RegisterCustomer(graphene.Mutation):
                 error_messages.extend([f"{field}: {msg}" for msg in messages])
             raise GraphQLError("\n".join(error_messages))
 
+class VerifyEmailPayload(graphene.ObjectType):
+    success = graphene.Boolean()
+    message = graphene.String()
+    
 class VerifyEmail(graphene.Mutation):
+    Output = VerifyEmailPayload  # This tells GraphQL what fields to expect
+
     class Arguments:
         email = graphene.String(required=True)
         code = graphene.String(required=True)
 
-    message = graphene.String()
-
     def mutate(self, info, email, code):
         try:
-            user = User.objects.get(email=email)
-            verification = EmailVerificationCode.objects.get(user=user)
-
-            if verification.is_verified:
-                return VerifyEmail(message="Email already verified.")
-
-            if verification.code != code:
-                raise GraphQLError("Invalid verification code.")
-
-            if verification.is_expired:
-                raise GraphQLError("Verification code has expired.")
-
-            verification.is_verified = True
-            verification.save()
-
-            user.is_active = True
-            user.save()
-
-            return VerifyEmail(message="Email verified successfully.")
-
-        except User.DoesNotExist:
-            raise GraphQLError("User not found.")
+            verification = EmailVerificationCode.objects.get(user__email=email)
         except EmailVerificationCode.DoesNotExist:
-            raise GraphQLError("Verification entry not found.")
+            raise GraphQLError("No verification code found for this email.")
+
+        if verification.is_verified:
+            return VerifyEmailPayload(success=False, message="Email already verified.")
+
+        if verification.is_expired:
+            return VerifyEmailPayload(success=False, message="Verification code expired.")
+
+        if verification.code != code:
+            return VerifyEmailPayload(success=False, message="Invalid verification code.")
+
+        verification.is_verified = True
+        verification.save()
+
+        verification.user.is_active = True
+        verification.user.save()
+
+        return VerifyEmailPayload(success=True, message="Email verified successfully.")
