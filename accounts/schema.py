@@ -50,7 +50,10 @@ class RegisterCustomer(graphene.Mutation):
 
             return RegisterCustomer(user=user, message="Customer registered. Please verify your email.")
         else:
-            raise GraphQLError(serializer.errors)
+            error_messages = []
+            for field, messages in serializer.errors.items():
+                error_messages.extend([f"{field}: {msg}" for msg in messages])
+            raise GraphQLError("\n".join(error_messages))
 
 class VerifyEmail(graphene.Mutation):
     class Arguments:
