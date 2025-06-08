@@ -2,14 +2,17 @@
 import graphene
 from accounts.models import User, Customer, EmailVerificationCode
 from accounts.serializers import UserSerializer, CustomerSerializer
+from .utils import send_verification_email
 from graphene_django.types import DjangoObjectType
 from graphql import GraphQLError
-from django.utils import timezone
+from django.db import transaction
+
 
 class UserType(DjangoObjectType):
     class Meta:
         model = User
-        fields = ['id', 'email', 'name', 'last_name', 'role']
+        fields = ['id', 'email', 'name', 'last_name', 'role', 'is_active', 'status']
+
 
 class RegisterCustomer(graphene.Mutation):
     class Arguments:
@@ -27,42 +30,58 @@ class RegisterCustomer(graphene.Mutation):
             'name': name,
             'last_name': last_name,
             'password': password,
-            'role': 'Customer'
+            'role': 'Customer',
         }
 
-        user_serializer = UserSerializer(data=user_data)
-        if user_serializer.is_valid():
-            user = user_serializer.save()
-            user.set_password(password)
-            user.save()
-            Customer.objects.create(user=user)
-            return RegisterCustomer(user=user, message="Customer registered successfully.")
+        serializer = UserSerializer(data=user_data)
+        if serializer.is_valid():
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    email=email,
+                    name=name,
+                    last_name=last_name,
+                    role='Customer',
+                    password=password,
+                    is_active=False  # email not verified yet
+                )
+                Customer.objects.create(user=user)
+                verification = EmailVerificationCode.objects.create(user=user)
+                send_verification_email(user, verification)
+
+            return RegisterCustomer(user=user, message="Customer registered. Please verify your email.")
         else:
-            raise Exception(user_serializer.errors)
+            raise GraphQLError(serializer.errors)
 
 class VerifyEmail(graphene.Mutation):
-    success = graphene.Boolean()
-    message = graphene.String()
-
     class Arguments:
         email = graphene.String(required=True)
         code = graphene.String(required=True)
 
+    message = graphene.String()
+
     def mutate(self, info, email, code):
         try:
-            verification = EmailVerificationCode.objects.select_related('user').get(user__email=email)
+            user = User.objects.get(email=email)
+            verification = EmailVerificationCode.objects.get(user=user)
+
+            if verification.is_verified:
+                return VerifyEmail(message="Email already verified.")
+
+            if verification.code != code:
+                raise GraphQLError("Invalid verification code.")
+
+            if verification.is_expired:
+                raise GraphQLError("Verification code has expired.")
+
+            verification.is_verified = True
+            verification.save()
+
+            user.is_active = True
+            user.save()
+
+            return VerifyEmail(message="Email verified successfully.")
+
+        except User.DoesNotExist:
+            raise GraphQLError("User not found.")
         except EmailVerificationCode.DoesNotExist:
-            raise GraphQLError("Verification entry not found for this email.")
-
-        if verification.is_verified:
-            return VerifyEmail(success=False, message="Email is already verified.")
-
-        if verification.code != code:
-            return VerifyEmail(success=False, message="Invalid verification code.")
-
-        if verification.is_expired:
-            return VerifyEmail(success=False, message="Verification code has expired.")
-
-        verification.is_verified = True
-        verification.save()
-        return VerifyEmail(success=True, message="Email verified successfully.")
+            raise GraphQLError("Verification entry not found.")
