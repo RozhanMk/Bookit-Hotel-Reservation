@@ -1,3 +1,5 @@
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -9,22 +11,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from accounts.utils import send_verification_email
 
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from .swagger_doc import (
-    list_hotel_managers_docs,
-    retrieve_hotel_manager_docs,
-    update_hotel_manager_docs,
-    register_hotel_manager_docs,
-    destroy_hotel_manager_docs
-)
 
 class HotelManagerViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description=list_hotel_managers_docs['operation_description'],
-        responses=list_hotel_managers_docs['responses']
+        operation_description="Retrieve a list of all hotel managers.",
+        responses={
+            200: HotelManagerSerializer(many=True),
+            404: 'Hotel manager not found'
+        }
     )
     def list(self, request):
         try:
@@ -35,9 +31,13 @@ class HotelManagerViewSet(viewsets.ViewSet):
             return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
 
     @swagger_auto_schema(
-        operation_description=update_hotel_manager_docs['operation_description'],
+        operation_description="Partially update the authenticated hotel manager’s information.",
         request_body=HotelManagerSerializer,
-        responses=update_hotel_manager_docs['responses']
+        responses={
+            200: HotelManagerSerializer,
+            400: 'Validation error',
+            404: 'Hotel manager not found'
+        }
     )
     def partial_update(self, request):
         user_email = request.user
@@ -53,8 +53,8 @@ class HotelManagerViewSet(viewsets.ViewSet):
             return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
 
     @swagger_auto_schema(
-        operation_description=destroy_hotel_manager_docs['operation_description'],
-        responses=destroy_hotel_manager_docs['responses']
+        operation_description="Delete the authenticated hotel manager.",
+        responses={204: 'Deleted successfully'}
     )
     def destroy(self, request):
         pass
@@ -63,19 +63,12 @@ class HotelManagerViewSet(viewsets.ViewSet):
 class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
 
     @swagger_auto_schema(
-        operation_description=register_hotel_manager_docs['operation_description'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
-                'name': openapi.Schema(type=openapi.TYPE_STRING),
-                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
-                'national_code': openapi.Schema(type=openapi.TYPE_STRING),
-                'password': openapi.Schema(type=openapi.TYPE_STRING)
-            },
-            required=['email', 'name', 'last_name', 'national_code', 'password']
-        ),
-        responses=register_hotel_manager_docs['responses']
+        operation_description="Register a new hotel manager (unauthenticated). Sends OTP email.",
+        request_body=HotelManagerSerializer,
+        responses={
+            201: 'Hotel manager created and OTP sent',
+            400: 'Hotel manager already exists or validation error'
+        }
     )
     def create(self, request):
         try:
@@ -83,7 +76,6 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
             if hotel_manager:
                 return Response({"error": "hotel manager exists"}, status=status.HTTP_400_BAD_REQUEST)
         except HotelManager.DoesNotExist:
-            user = None
             data = request.data
             serializer = HotelManagerSerializer(data=data)
             if serializer.is_valid():
@@ -109,25 +101,25 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
-        operation_description=retrieve_hotel_manager_docs['operation_description'],
+        operation_description="Login hotel manager and return access token.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
+            required=['email', 'password'],
             properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL),
-                'password': openapi.Schema(type=openapi.TYPE_STRING)
+                'email': openapi.Schema(type=openapi.TYPE_STRING, format='email'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, format='password'),
             },
-            required=['email', 'password']
         ),
-        responses=retrieve_hotel_manager_docs['responses']
+        responses={
+            200: openapi.Response("Successful login", HotelManagerSerializer),
+            404: 'User or hotel manager not found'
+        }
     )
     def retrieve(self, request):
         email = request.data['email']
         password = request.data['password']
         try:
             user = User.objects.get(email=email)
-            if not user.check_password(password):
-                return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-                
             hotel_manager = HotelManager.objects.get(user__email=email)
             serializer = HotelManagerSerializer(hotel_manager)
             refresh = RefreshToken.for_user(user)
