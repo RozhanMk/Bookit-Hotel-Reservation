@@ -12,7 +12,5 @@ urlpatterns = [
     path('remove/', HotelManagerViewSet.as_view({'delete': 'destroy',})),
     path('create/', NoneAuthHotelManagerViewSet.as_view({'post': 'create',})),
     path('list/', HotelManagerViewSet.as_view({'get': 'list',})),
-    path('swagger/hotel-manager', schema_view.with_ui('swagger', cache_timeout=0)),
-    path('redoc/hotel-manager', schema_view.with_ui('redoc', cache_timeout=0)),
 ]
 
