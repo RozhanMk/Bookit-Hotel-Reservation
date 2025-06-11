@@ -1,254 +1,197 @@
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from accounts.models import User, EmailVerificationCode
-from accounts.serializers import UserSerializer
-from hotelManager.models import HotelManager
-from hotelManager.serializers import HotelManagerSerializer
+from rest_framework.decorators import action
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
+from accounts.models import User, EmailVerificationCode
 from accounts.utils import send_verification_email
+from hotelManager.models import HotelManager
+from .serializers import HotelManagerSerializer, HotelManagerCreateSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 
 class HotelManagerViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return HotelManagerCreateSerializer
+        return HotelManagerSerializer
 
     @swagger_auto_schema(
-        operation_description="Get authenticated hotel manager's profile",
-        responses={
-            200: openapi.Response(
-                description="Success",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT)
-                    }
-                )
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
+        operation_description="List all hotel managers (admin only)",
+        responses={200: HotelManagerSerializer(many=True)}
+    )
+    def list(self, request):
+        if not request.user.is_staff:
+            return Response(
+                {"error": "You don't have permission to view this"},
+                status=status.HTTP_403_FORBIDDEN
             )
-        }
+        queryset = HotelManager.objects.all()
+        serializer = HotelManagerSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_description="Create a new hotel manager (admin only)",
+        request_body=HotelManagerCreateSerializer,
+        responses={201: HotelManagerSerializer}
+    )
+    def create(self, request):
+        if not request.user.is_staff:
+            return Response(
+                {"error": "You don't have permission to create managers"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer = HotelManagerCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+        operation_description="Get hotel manager details",
+        responses={200: HotelManagerSerializer}
     )
     def retrieve(self, request, pk=None):
         try:
-            user_email = request.user.email
-            hotel_manager = HotelManager.objects.get(user__email=user_email)
-            serializer = HotelManagerSerializer(hotel_manager)
-            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+            if pk:
+                instance = HotelManager.objects.get(pk=pk)
+            else:
+                instance = HotelManager.objects.get(user=request.user)
+            serializer = HotelManagerSerializer(instance)
+            return Response(serializer.data)
         except HotelManager.DoesNotExist:
-            return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Hotel manager not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     @swagger_auto_schema(
-        operation_description="List all hotel managers",
-        responses={
-            200: openapi.Response(
-                description="Success",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_OBJECT)
-                )
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
-            ),
-            403: openapi.Response(
-                description="Forbidden",
-                examples={
-                    "application/json": {"detail": "Authentication credentials were not provided."}
-                }
-            )
-        }
+        operation_description="Update hotel manager details",
+        request_body=HotelManagerSerializer,
+        responses={200: HotelManagerSerializer}
     )
-    def list(self, request):
+    def update(self, request, pk=None):
         try:
-            hotel_managers = HotelManager.objects.all()
-            serializer = HotelManagerSerializer(hotel_managers, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    @swagger_auto_schema(
-        operation_description="Update authenticated hotel manager's profile",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'national_code': openapi.Schema(type=openapi.TYPE_STRING),
-                'name': openapi.Schema(type=openapi.TYPE_STRING),
-                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
-            }
-        ),
-        responses={
-            200: openapi.Response(
-                description="Success",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT)
-                    }
+            instance = HotelManager.objects.get(pk=pk)
+            if instance.user != request.user and not request.user.is_staff:
+                return Response(
+                    {"error": "You can only update your own profile"},
+                    status=status.HTTP_403_FORBIDDEN
                 )
-            ),
-            400: openapi.Response(
-                description="Bad Request",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'errors': openapi.Schema(type=openapi.TYPE_OBJECT)
-                    }
-                )
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
-            )
-        }
-    )
-    def partial_update(self, request, pk=None):
-        user_email = request.user.email
-        try:
-            hotel_manager = HotelManager.objects.get(user__email=user_email)
-            data = request.data
-            serializer = HotelManagerSerializer(data=data, instance=hotel_manager, partial=True)
+            serializer = HotelManagerSerializer(instance, data=request.data)
             if serializer.is_valid():
                 serializer.save()
-                return Response({"data": serializer.data}, status=status.HTTP_200_OK)
-            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except HotelManager.DoesNotExist:
-            return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Hotel manager not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     @swagger_auto_schema(
-        operation_description="Delete hotel manager account",
-        responses={
-            204: openapi.Response(
-                description="No Content",
-            ),
-            403: openapi.Response(
-                description="Forbidden",
-                examples={
-                    "application/json": {"detail": "Authentication credentials were not provided."}
-                }
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
+        operation_description="Partial update hotel manager details",
+        request_body=HotelManagerSerializer,
+        responses={200: HotelManagerSerializer}
+    )
+    def partial_update(self, request, pk=None):
+        try:
+            instance = HotelManager.objects.get(pk=pk)
+            if instance.user != request.user and not request.user.is_staff:
+                return Response(
+                    {"error": "You can only update your own profile"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            serializer = HotelManagerSerializer(
+                instance, 
+                data=request.data, 
+                partial=True
             )
-        }
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except HotelManager.DoesNotExist:
+            return Response(
+                {"error": "Hotel manager not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @swagger_auto_schema(
+        operation_description="Delete a hotel manager",
+        responses={204: "No content"}
     )
     def destroy(self, request, pk=None):
         try:
-            user_email = request.user.email
-            hotel_manager = HotelManager.objects.get(user__email=user_email)
-            hotel_manager.delete()
+            instance = HotelManager.objects.get(pk=pk)
+            if instance.user != request.user and not request.user.is_staff:
+                return Response(
+                    {"error": "You can only delete your own profile"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            instance.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except HotelManager.DoesNotExist:
-            return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Hotel manager not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @swagger_auto_schema(
+        operation_description="Get current hotel manager profile",
+        responses={200: HotelManagerSerializer}
+    )
+    @action(detail=False, methods=['get'])
+    def get_profile(self, request):
+        try:
+            instance = HotelManager.objects.get(user=request.user)
+            serializer = HotelManagerSerializer(instance)
+            return Response(serializer.data)
+        except HotelManager.DoesNotExist:
+            return Response(
+                {"error": "Hotel manager not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
-
     @swagger_auto_schema(
         operation_description="Register a new hotel manager",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=['email', 'name', 'last_name', 'national_code', 'password'],
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format='email'),
-                'name': openapi.Schema(type=openapi.TYPE_STRING),
-                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
-                'national_code': openapi.Schema(type=openapi.TYPE_STRING),
-                'password': openapi.Schema(type=openapi.TYPE_STRING),
-            }
-        ),
-        responses={
-            201: openapi.Response(
-                description="Created",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {
-                        "data": {
-                            "user": {"email": "manager@example.com", "name": "John", "last_name": "Doe"},
-                            "national_code": "1234567890"
-                        },
-                        "message": "hotel manager created not active enter otp code"
-                    }
-                }
-            ),
-            400: openapi.Response(
-                description="Bad Request",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING),
-                        'errors': openapi.Schema(type=openapi.TYPE_OBJECT)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "hotel manager exists"}
-                }
-            )
-        }
+        request_body=HotelManagerCreateSerializer,
+        responses={201: HotelManagerSerializer}
     )
     def create(self, request):
-        serializer = HotelManagerSerializer(data=request.data)
+        serializer = HotelManagerCreateSerializer(data=request.data)
         if serializer.is_valid():
-            data = serializer.validated_data
             try:
                 with transaction.atomic():
-                    user = User.objects.create_user(
-                        email=data['email'],
-                        name=data['name'],
-                        last_name=data['last_name'],
-                        password=data['password'],
-                        role="Hotel Manager",
-                        is_active=False
+                    hotel_manager = serializer.save()
+                    verification = EmailVerificationCode.objects.create(
+                        user=hotel_manager.user
                     )
-                    manager = HotelManager.objects.create(
-                        user=user,
-                        national_code=data['national_code']
-                    )
-                    verification = EmailVerificationCode.objects.create(user=user)
-                    send_verification_email(user, verification)
+                    send_verification_email(hotel_manager.user, verification)
 
                     return Response({
                         'data': {
-                            "user": {
-                                "email": user.email,
-                                "name": user.name,
-                                "last_name": user.last_name
-                            },
-                            "national_code": manager.national_code
+                            "email": hotel_manager.user.email,
+                            "name": hotel_manager.user.name,
+                            "last_name": hotel_manager.user.last_name,
+                            "national_code": hotel_manager.national_code
                         },
-                        'message': "hotel manager created not active enter otp code"
+                        'message': "Hotel manager created. Please verify your email."
                     }, status=status.HTTP_201_CREATED)
-
             except Exception as e:
-                return Response({"error": "Failed to create hotel manager"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
+                return Response(
+                    {"error": str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @swagger_auto_schema(
         operation_description="Login as hotel manager",
@@ -266,75 +209,52 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'data': HotelManagerSerializer,
                         'access': openapi.Schema(type=openapi.TYPE_STRING),
                         'refresh': openapi.Schema(type=openapi.TYPE_STRING)
                     }
-                ),
-                examples={
-                    "application/json": {
-                        "data": {
-                            "user": {"email": "manager@example.com", "name": "John", "last_name": "Doe"},
-                            "national_code": "1234567890"
-                        },
-                        "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                        "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    }
-                }
+                )
             ),
-            400: openapi.Response(
-                description="Bad Request",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "Invalid credentials"}
-                }
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
-            )
+            400: "Invalid credentials",
+            404: "User not found"
         }
     )
     def retrieve(self, request):
-        email = request.data.get('email', '')
-        password = request.data.get('password', '')
+        email = request.data.get('email')
+        password = request.data.get('password')
         
         if not email or not password:
-            return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Email and password are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         try:
             user = User.objects.get(email=email)
-            # Check password
             if not user.check_password(password):
-                return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Invalid credentials"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             if not user.is_active:
-                return Response({"error": "Account is not active"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Account is not active"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            hotel_manager = HotelManager.objects.get(user__email=email)
+            hotel_manager = HotelManager.objects.get(user=user)
             serializer = HotelManagerSerializer(hotel_manager)
             refresh = RefreshToken.for_user(user)
+            
             return Response({
                 "data": serializer.data,
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
             }, status=status.HTTP_200_OK)
-        except HotelManager.DoesNotExist:
-            return Response({"error": "hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
-        except User.DoesNotExist:
-            return Response({"error": "user does not exist"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": "Login failed"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        except (HotelManager.DoesNotExist, User.DoesNotExist):
+            return Response(
+                {"error": "Invalid credentials"},
+                status=status.HTTP_404_NOT_FOUND
+            )
