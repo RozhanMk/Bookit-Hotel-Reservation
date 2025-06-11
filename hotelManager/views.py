@@ -222,24 +222,13 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
             pass
 
         data = request.data
-        serializer = HotelManagerSerializer(data=data)
+        serializer = HotelManagerSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             try:
                 with transaction.atomic():
-                    user = User.objects.create_user(
-                        email=data['email'],
-                        name=data['name'],
-                        last_name=data['last_name'],
-                        role="Hotel Manager",
-                        password=data['password'],
-                        is_active=False
-                    )
-                    manager = HotelManager.objects.create(
-                        user=user,
-                        national_code=data['national_code'],
-                    )
-                verification = EmailVerificationCode.objects.create(user=user)
-                send_verification_email(user, verification)
+                    manager = serializer.save()
+                    verification = EmailVerificationCode.objects.create(user=manager.user)
+                    send_verification_email(manager.user, verification)
                 return Response({
                     'data': HotelManagerSerializer(manager).data,
                     'message': "hotel manager created not active enter otp code"
