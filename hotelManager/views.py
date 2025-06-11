@@ -1,7 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from accounts.models import User, EmailVerificationCode
 from accounts.serializers import UserSerializer
 from hotelManager.models import HotelManager
@@ -9,9 +8,9 @@ from hotelManager.serializers import HotelManagerSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from accounts.utils import send_verification_email
-from django.contrib.auth import authenticate
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+
 
 class HotelManagerViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -48,7 +47,13 @@ class HotelManagerViewSet(viewsets.ViewSet):
     @swagger_auto_schema(
         operation_description="List all hotel managers",
         responses={
-            200: HotelManagerSerializer(many=True),
+            200: openapi.Response(
+                description="Success",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                )
+            ),
             404: openapi.Response(
                 description="Not Found",
                 schema=openapi.Schema(
@@ -71,7 +76,6 @@ class HotelManagerViewSet(viewsets.ViewSet):
     )
     def list(self, request):
         try:
-            # Fixed: Use filter() instead of get_all() if that method doesn't exist
             hotel_managers = HotelManager.objects.all()
             serializer = HotelManagerSerializer(hotel_managers, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -80,14 +84,21 @@ class HotelManagerViewSet(viewsets.ViewSet):
 
     @swagger_auto_schema(
         operation_description="Update authenticated hotel manager's profile",
-        request_body=HotelManagerSerializer,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'national_code': openapi.Schema(type=openapi.TYPE_STRING),
+                'name': openapi.Schema(type=openapi.TYPE_STRING),
+                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
+            }
+        ),
         responses={
             200: openapi.Response(
                 description="Success",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        'data': HotelManagerSerializer()._declared_fields
+                        'data': openapi.Schema(type=openapi.TYPE_OBJECT)
                     }
                 )
             ),
@@ -109,7 +120,7 @@ class HotelManagerViewSet(viewsets.ViewSet):
         }
     )
     def partial_update(self, request, pk=None):
-        user_email = request.user.email  # Fixed: Added .email
+        user_email = request.user.email
         try:
             hotel_manager = HotelManager.objects.get(user__email=user_email)
             data = request.data
@@ -295,64 +306,6 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
             )
         }
     )
-    @swagger_auto_schema(
-        operation_description="Login as hotel manager",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=['email', 'password'],
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format='email'),
-                'password': openapi.Schema(type=openapi.TYPE_STRING),
-            }
-        ),
-        responses={
-            200: openapi.Response(
-                description="Success",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
-                        'access': openapi.Schema(type=openapi.TYPE_STRING),
-                        'refresh': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {
-                        "data": {
-                            "user": {"email": "manager@example.com", "name": "John", "last_name": "Doe"},
-                            "national_code": "1234567890"
-                        },
-                        "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                        "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    }
-                }
-            ),
-            400: openapi.Response(
-                description="Bad Request",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "Invalid credentials"}
-                }
-            ),
-            404: openapi.Response(
-                description="Not Found",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
-                ),
-                examples={
-                    "application/json": {"error": "hotel manager not found"}
-                }
-            )
-        }
-    )
     def retrieve(self, request):
         email = request.data.get('email', '')
         password = request.data.get('password', '')
@@ -362,7 +315,7 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
         
         try:
             user = User.objects.get(email=email)
-            # Fixed: Added proper password authentication
+            # Check password
             if not user.check_password(password):
                 return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
             
