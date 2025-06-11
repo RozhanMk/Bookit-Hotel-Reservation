@@ -86,11 +86,12 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
         responses={201: 'Hotel manager created and OTP sent', 400: 'Hotel manager already exists or validation error'}
     )
     def create(self, request):
-        try:
-            if HotelManager.objects.filter(user__email=request.data['email']).exists():
-                return Response({"error": "hotel manager exists"}, status=status.HTTP_400_BAD_REQUEST)
-        except KeyError:
+        email = request.data.get('email')
+        if not email:
             return Response({"error": "email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if HotelManager.objects.filter(user__email=email).exists():
+            return Response({"error": "hotel manager exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = HotelManagerSerializer(data=request.data)
         if serializer.is_valid():
@@ -115,6 +116,7 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
                     'message': "hotel manager created, not active, enter OTP code"
                 }, status=status.HTTP_201_CREATED)
         return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
 
     @swagger_auto_schema(
         operation_description="Login hotel manager and return access token.",
