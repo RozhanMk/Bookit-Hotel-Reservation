@@ -10,6 +10,9 @@ from django.db import transaction
 from accounts.utils import send_verification_email
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class HotelManagerViewSet(viewsets.ViewSet):
@@ -213,40 +216,97 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
         }
     )
     def create(self, request):
+        # Validate required fields
+        required_fields = ['email', 'name', 'last_name', 'national_code', 'password']
+        missing_fields = [field for field in required_fields if not request.data.get(field)]
+        
+        if missing_fields:
+            return Response({
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        email = request.data.get('email', '').strip()
+        
+        # Check if email is valid
+        if not email or '@' not in email:
+            return Response({"error": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if hotel manager already exists
         try:
-            # Check if hotel manager already exists
-            email = request.data.get('email', '')
             if HotelManager.objects.filter(user__email=email).exists():
                 return Response({"error": "hotel manager exists"}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error checking existing hotel manager: {str(e)}")
+            
+        # Check if user already exists
+        try:
+            if User.objects.filter(email=email).exists():
+                return Response({"error": "User with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error checking existing user: {str(e)}")
 
         data = request.data
+        
+        # Validate data with serializer first
         serializer = HotelManagerSerializer(data=data)
-        if serializer.is_valid():
-            try:
-                with transaction.atomic():
+        if not serializer.is_valid():
+            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                # Create user
+                try:
                     user = User.objects.create_user(
-                        email=data['email'],
-                        name=data['name'],
-                        last_name=data['last_name'],
+                        email=data['email'].strip(),
+                        name=data['name'].strip(),
+                        last_name=data['last_name'].strip(),
                         role="Hotel Manager",
                         password=data['password'],
                         is_active=False
                     )
+                    logger.info(f"User created successfully: {user.email}")
+                except Exception as e:
+                    logger.error(f"Error creating user: {str(e)}")
+                    raise Exception(f"Failed to create user: {str(e)}")
+                
+                # Create hotel manager
+                try:
                     manager = HotelManager.objects.create(
                         user=user,
-                        national_code=data['national_code'],
+                        national_code=data['national_code'].strip(),
                     )
-                verification = EmailVerificationCode.objects.create(user=user)
-                send_verification_email(user, verification)
+                    logger.info(f"Hotel manager created successfully: {manager.id}")
+                except Exception as e:
+                    logger.error(f"Error creating hotel manager: {str(e)}")
+                    raise Exception(f"Failed to create hotel manager: {str(e)}")
+                
+                # Create email verification
+                try:
+                    verification = EmailVerificationCode.objects.create(user=user)
+                    logger.info(f"Email verification code created: {verification.id}")
+                except Exception as e:
+                    logger.error(f"Error creating email verification: {str(e)}")
+                    raise Exception(f"Failed to create email verification: {str(e)}")
+                
+                # Send verification email
+                try:
+                    send_verification_email(user, verification)
+                    logger.info(f"Verification email sent to: {user.email}")
+                except Exception as e:
+                    logger.error(f"Error sending verification email: {str(e)}")
+                    # Don't fail the transaction for email sending issues
+                    # Just log the error and continue
+                
                 return Response({
                     'data': HotelManagerSerializer(manager).data,
                     'message': "hotel manager created not active enter otp code"
                 }, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                return Response({"error": "Failed to create hotel manager"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Transaction failed: {str(e)}")
+            return Response({
+                "error": f"Failed to create hotel manager: {str(e)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
         operation_description="Login as hotel manager",
@@ -335,4 +395,5 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
         except User.DoesNotExist:
             return Response({"error": "user does not exist"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.error(f"Login failed: {str(e)}")
             return Response({"error": "Login failed"}, status=status.HTTP_400_BAD_REQUEST)
