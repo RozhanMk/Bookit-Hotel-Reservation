@@ -213,29 +213,42 @@ class NoneAuthHotelManagerViewSet(viewsets.ViewSet):
         }
     )
     def create(self, request):
-        try:
-            # Check if hotel manager already exists
-            email = request.data.get('email', '')
-            if HotelManager.objects.filter(user__email=email).exists():
-                return Response({"error": "hotel manager exists"}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception:
-            pass
-
-        data = request.data
-        serializer = HotelManagerSerializer(data=data, context={'request': request})
+        serializer = HotelManagerSerializer(data=request.data)
         if serializer.is_valid():
+            data = serializer.validated_data
             try:
                 with transaction.atomic():
-                    manager = serializer.save()
-                    verification = EmailVerificationCode.objects.create(user=manager.user)
-                    send_verification_email(manager.user, verification)
-                return Response({
-                    'data': HotelManagerSerializer(manager).data,
-                    'message': "hotel manager created not active enter otp code"
-                }, status=status.HTTP_201_CREATED)
+                    user = User.objects.create_user(
+                        email=data['email'],
+                        name=data['name'],
+                        last_name=data['last_name'],
+                        password=data['password'],
+                        role="Hotel Manager",
+                        is_active=False
+                    )
+                    manager = HotelManager.objects.create(
+                        user=user,
+                        national_code=data['national_code']
+                    )
+                    verification = EmailVerificationCode.objects.create(user=user)
+                    send_verification_email(user, verification)
+
+                    return Response({
+                        'data': {
+                            "user": {
+                                "email": user.email,
+                                "name": user.name,
+                                "last_name": user.last_name
+                            },
+                            "national_code": manager.national_code
+                        },
+                        'message': "hotel manager created not active enter otp code"
+                    }, status=status.HTTP_201_CREATED)
+
             except Exception as e:
                 return Response({"error": "Failed to create hotel manager"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
 
     @swagger_auto_schema(
         operation_description="Login as hotel manager",
