@@ -13,8 +13,8 @@ class HotelManagerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HotelManager
-        fields = ['user', 'national_code', 'state']
-        read_only_fields = ['state']
+        fields = ['user', 'national_code', 'status']
+        read_only_fields = ['status']
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
