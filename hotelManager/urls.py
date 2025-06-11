@@ -5,11 +5,27 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-
 urlpatterns = [
-    path('hotel-manager/', HotelManagerViewSet.as_view({'patch': 'partial_update', 'get': 'retrieve'})),
-    path('get/', NoneAuthHotelManagerViewSet.as_view({'post': 'retrieve'})),
-    path('remove/', HotelManagerViewSet.as_view({'delete': 'destroy',})),
-    path('create/', NoneAuthHotelManagerViewSet.as_view({'post': 'create',})),
-    path('list/', HotelManagerViewSet.as_view({'get': 'list',})),
+    # Authenticated hotel manager endpoints
+    path('hotel-manager/', HotelManagerViewSet.as_view({
+        'get': 'retrieve',      # Get current manager's profile
+        'patch': 'partial_update'  # Update current manager's profile
+    })),
+    
+    path('list/', HotelManagerViewSet.as_view({
+        'get': 'list'           # List all hotel managers (admin function)
+    })),
+    
+    path('remove/', HotelManagerViewSet.as_view({
+        'delete': 'destroy'     # Delete current manager's account
+    })),
+    
+    # Non-authenticated endpoints
+    path('create/', NoneAuthHotelManagerViewSet.as_view({
+        'post': 'create'        # Register new hotel manager
+    })),
+    
+    path('login/', NoneAuthHotelManagerViewSet.as_view({
+        'post': 'retrieve'      # Login hotel manager
+    })),
 ]
