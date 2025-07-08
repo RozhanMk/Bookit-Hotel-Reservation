@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'hotelManager',
     'room',
     'reservation',
+    'review',
 ]
 
 GRAPHENE = {

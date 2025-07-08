@@ -6,13 +6,9 @@ urlpatterns = [
     path('hotel-managers/', HotelManagerViewSet.as_view({
         'get': 'list',
     })),
-    path('hotel-managers/<int:pk>/', HotelManagerViewSet.as_view({
-        'get': 'retrieve',
-        'patch': 'partial_update',
-        'delete': 'destroy'
-    })),
     path('hotel-managers/profile/', HotelManagerViewSet.as_view({
-        'get': 'get_profile'  
+        'get': 'get_profile',
+        'patch': 'partial_update',
     })),
     # Your non-auth endpoints
     path('register/', NoneAuthHotelManagerViewSet.as_view({'post': 'create'})),

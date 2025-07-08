@@ -31,6 +31,7 @@ urlpatterns = [
     path('hotelManager-api/', include('hotelManager.urls')),
     path('room-api/', include('room.urls')),
     path('reservation-api/', include('reservation.urls')),
+    path('reviews/', include('review.urls')),
 
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
