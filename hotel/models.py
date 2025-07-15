@@ -59,7 +59,8 @@ class Hotel(BaseModel):
         choices=DiscountStatus.choices,
         default=DiscountStatus.INACTIVE
     )
-
+    discount_start_date = models.DateTimeField(null=True, blank=True)
+    discount_end_date = models.DateTimeField(null=True, blank=True)
 
 
 class HotelFacility(models.Model):

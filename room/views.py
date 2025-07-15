@@ -176,27 +176,40 @@ class RoomViewSet(viewsets.ViewSet):
         operation_description="Retrieve a specific room by ID",
         responses={200: RoomSerializer(), 404: 'Room not found'}
     )
+
+    
     def retrieve(self, request, pk=None):
         """Get details of a specific room"""
         try:
-            room = Room.objects.get(pk=pk)
-            serializer = RoomSerializer(room)
+            # Get all rooms for the given hotel ID
+            rooms = Room.objects.filter(hotel_id=pk)
+            
+            # Check if any rooms exist for this hotel
+            if not rooms.exists():
+                return Response(
+                    {"error": "No rooms found for this hotel"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+            # Serialize the queryset (many=True since it's multiple objects)
+            serializer = RoomSerializer(rooms, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
-        except Room.DoesNotExist:
+            
+        except Exception as e:
             return Response(
-                {"error": "Room not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
 
     @swagger_auto_schema(
         operation_description="Partially update a room (Only by the hotel manager)",
         request_body=RoomSerializer,
         responses={200: RoomSerializer(), 400: 'Validation error', 403: 'Permission denied'}
     )
-    def partial_update(self, request, pk=None):
+    def partial_update(self, request):
         """Update a room's details"""
         try:
-            room = Room.objects.get(pk=pk)
+            room = Room.objects.get(pk=request.data.get("room_id"))
 
             # Verify the requesting user is the hotel manager
             if not Hotel.objects.filter(

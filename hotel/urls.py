@@ -11,4 +11,7 @@ urlpatterns = [
     })),
     path('all-hotels/', HotelViewSet.as_view({'get': 'list'})),  # List all accepted hotels (public)
     path('add-fac/', FacilitySeederViewSet.as_view({'post': 'create_fac'})),
+    path('hotels/by-location/', HotelViewSet.as_view({'get': 'hotels_by_location'})),
+    path('hotels/with-discount/', HotelViewSet.as_view({'get': 'hotels_with_discount'})),
+    path('hotels/top-rated/', HotelViewSet.as_view({'get': 'top_rated_hotels'})),
 ]

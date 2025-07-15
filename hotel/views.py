@@ -1,5 +1,10 @@
+import os
+
+from django.db import IntegrityError
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
+
+from bookit import settings
 from hotel.models import Hotel, HotelFacility, Facility
 from hotelManager.models import HotelManager
 from hotel.serializers import HotelSerializer
@@ -69,10 +74,54 @@ class HotelViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         """Partially update hotel info by pk"""
         hotel = get_object_or_404(Hotel, pk=pk, hotel_manager__user=request.user)
-        serializer = HotelSerializer(hotel, data=request.data, partial=True, context={'request': request})
+        data = request.data.copy()
+        
+        # Handle facilities if present in the request
+        if 'facilities' in data:
+            try:
+                # Clear existing facilities
+                hotel.facilities.clear()
+                
+                # Add new facilities
+                facilities = data.get('facilities').split(",")
+                for facility_name in facilities:
+                    try:
+                        facility = HotelFacility.objects.get(facility_type=facility_name.strip())
+                        hotel.facilities.add(facility)
+                    except HotelFacility.DoesNotExist:
+                        continue
+                
+                # Remove facilities from data to avoid serializer issues
+                del data['facilities']
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+        serializer = HotelSerializer(hotel, data=data, partial=True, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
-            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+            try:
+                # Handle file uploads similar to create method
+                files_list = {
+                    "image": [settings.MEDIA_ROOT + "/hotel/images/", 'image'],
+                    "hotel_license": [settings.MEDIA_ROOT + "/hotel/licenses/", 'license']
+                }
+    
+                for field in files_list.keys():
+                    if field in request.FILES:
+                        file = request.FILES[field]
+                        upload_path = files_list[field][0]
+                        file_extension = os.path.splitext(file.name)[1]
+                        file_name = f"hotel_{hotel.id}_{field}{file_extension}"
+    
+                        if os.path.exists(os.path.join(upload_path, file_name)):
+                            os.remove(os.path.join(upload_path, file_name))
+    
+                        file.name = file_name
+                        setattr(hotel, field, file)
+    
+                serializer.save()
+                return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
@@ -99,21 +148,105 @@ class HotelViewSet(viewsets.ViewSet):
         tags=['Hotel']
     )
     def create(self, request):
-        """Creates a new hotel for the authenticated hotel_manager"""
+        """Creates a new hotel for the authenticated hotel_manager with facilities"""
         try:
             hotel_manager = HotelManager.objects.get(user=request.user)
         except HotelManager.DoesNotExist:
             return Response({"error": "Hotel manager not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        if Hotel.objects.filter(location=request.data.get('location')).exists():
-            return Response({'error': 'Hotel already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data.copy()
 
-        serializer = HotelSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()  # Hotel manager is injected in the serializer
+        try:
+            files_list = {
+                "image": [settings.MEDIA_ROOT + "/hotel/images/", 'image'],
+                "hotel_license": [settings.MEDIA_ROOT + "/hotel/licenses/", 'license']
+            }
+
+            hotel = Hotel.objects.create(
+                hotel_manager=hotel_manager,
+                name=data.get('name'),
+                location=data.get('location'),
+                description=data.get('description'),
+                hotel_iban_number=data.get('hotel_iban_number', ''),
+                status=data.get('status', 'Pending'),
+                discount=data.get('discount', 0),
+                discount_status=data.get('discount_status', 'Inactive')
+            )
+
+            for field in files_list.keys():
+                if field in request.FILES:
+                    file = request.FILES[field]
+                    upload_path = files_list[field][0]
+                    file_extension = os.path.splitext(file.name)[1]
+                    file_name = f"hotel_{hotel.id}_{field}{file_extension}"
+
+                    if os.path.exists(os.path.join(upload_path, file_name)):
+                        os.remove(os.path.join(upload_path, file_name))
+
+                    file.name = file_name
+                    setattr(hotel, field, file)
+
+            facilities = data.get('facilities').split(",")
+            for facility_name in facilities:
+                try:
+                    facility = HotelFacility.objects.get(facility_type=facility_name)
+                    hotel.facilities.add(facility)
+                except HotelFacility.DoesNotExist:
+                    continue
+
+            hotel.save()
+
+            serializer = HotelSerializer(hotel)
             return Response({"data": serializer.data}, status=status.HTTP_201_CREATED)
 
-        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            return Response({"error": "A hotel with the provided information already exists."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('location', openapi.IN_QUERY, description="Location to filter hotels", type=openapi.TYPE_STRING)
+        ],
+        responses={200: openapi.Response('Hotels filtered by location', HotelSerializer(many=True))},
+        operation_description="List all accepted hotels filtered by location.",
+        tags=['Hotel']
+    )
+    @action(detail=False, methods=['get'], url_path='by-location')
+    def hotels_by_location(self, request):
+        location = request.query_params.get('location')
+        if not location:
+            return Response({'error': 'Location query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        hotels = Hotel.objects.filter(location__iexact=location, status="Accepted")
+        serializer = HotelSerializer(hotels, many=True, context={'request': request})
+        return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+
+    @swagger_auto_schema(
+        responses={200: openapi.Response('Hotels with discount', HotelSerializer(many=True))},
+        operation_description="List all accepted hotels that have a discount.",
+        tags=['Hotel']
+    )
+    @action(detail=False, methods=['get'], url_path='with-discount')
+    def hotels_with_discount(self, request):
+        hotels = Hotel.objects.filter(discount__gt=0, status="Accepted")
+        serializer = HotelSerializer(hotels, many=True, context={'request': request})
+        return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+
+    @swagger_auto_schema(
+        responses={200: openapi.Response('Hotels with rating > 4.5', HotelSerializer(many=True))},
+        operation_description="List all accepted hotels with a rating greater than 4.5.",
+        tags=['Hotel']
+    )
+    @action(detail=False, methods=['get'], url_path='top-rated')
+    def top_rated_hotels(self, request):
+        hotels = Hotel.objects.filter(rate__gt=4.5, status="Accepted")
+        serializer = HotelSerializer(hotels, many=True, context={'request': request})
+        return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
 
 class FacilitySeederViewSet (viewsets.ViewSet):
@@ -152,5 +285,4 @@ class FacilitySeederViewSet (viewsets.ViewSet):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 

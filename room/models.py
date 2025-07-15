@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from core.models import BaseModel
 from hotel.models import Hotel
+from accounts.models import User
 
 
 class RoomType(models.TextChoices):
@@ -18,6 +19,7 @@ class DiscountStatus(models.TextChoices):
 
 class Room(BaseModel):
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE, related_name='rooms')
+    room_number = models.IntegerField()
     name = models.CharField(max_length=120)
     room_type = models.CharField(max_length=15, choices=RoomType.choices)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
@@ -52,3 +54,12 @@ class Room(BaseModel):
         self.hotel.discount = 0
         self.hotel.discount_status = DiscountStatus.INACTIVE
         self.save()
+
+
+class RoomLock(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    locked_until = models.DateTimeField()
+
+    class Meta:
+        unique_together = ('user', 'room')

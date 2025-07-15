@@ -1,14 +1,14 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-from rest_framework.test import APITestCase, APIClient
+from rest_framework.test import APIClient
 from rest_framework import status
 from decimal import Decimal
 from hotel.models import Hotel
 from hotelManager.models import HotelManager
-from room.models import Room, RoomType, DiscountStatus
+from room.models import Room, RoomType
 from reservation.models import Reservation
 from accounts.models import Customer, User
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
@@ -42,24 +42,28 @@ class RoomModelTest(TestCase):
         # Create test rooms
         self.room1 = Room.objects.create(
             hotel=self.hotel,
+            room_number = 1,
             name='1',
             room_type=RoomType.SINGLE,
             price=Decimal('100.00'),
         )
         self.room2 = Room.objects.create(
             hotel=self.hotel,
+            room_number = 2,
             name='2',
             room_type=RoomType.SINGLE,
             price=Decimal('100.00'),
         )
         self.room3 = Room.objects.create(
             hotel=self.hotel,
+            room_number = 3,
             name='3',
             room_type=RoomType.DOUBLE,
             price=Decimal('150.00'),
         )
         self.room4 = Room.objects.create(
             hotel=self.hotel,
+            room_number = 4,
             name='4',
             room_type=RoomType.TRIPLE,
             price=Decimal('200.00'),
@@ -78,7 +82,6 @@ class RoomModelTest(TestCase):
         self.reservation = Reservation.objects.create(
             room=self.room4,
             customer=self.customer,
-            count_of_guests=1,
             check_in_date=self.check_in,
             check_out_date=self.check_out,
             status='confirmed'
@@ -98,6 +101,7 @@ class RoomModelTest(TestCase):
         data = {
             "image": self.generate_image(),
             'hotel': self.hotel.id,
+            'room_number' : 109,
             'name':'test room',
             'room_type': 'Single',
             'price': 300,

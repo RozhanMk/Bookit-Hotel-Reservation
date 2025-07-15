@@ -21,6 +21,12 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     last_name = models.CharField(max_length=100, default='')
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='Customer')
     is_staff = models.BooleanField(default=False)
+    favorite_hotels = models.ManyToManyField(
+        'hotel.Hotel',
+        blank=True,
+        related_name='favorited_by',
+        help_text='Hotels that this user has marked as favorites'
+    )
     
     objects = UserManager()
     

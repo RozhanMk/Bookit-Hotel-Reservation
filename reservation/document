@@ -1,0 +1,44 @@
+
+بعد از اینکه لیست اتاق ها را به کاربر با شماره اتاق و ای دی هتل ان اتاق ها نمایش دادیم اگر کاربر ان اتاق را انتخاب کرد باید ابتدا ان اتاق را قفل کرد تا شخص دیگری ان را رزرو نکند همزمان
+ اگر کاربر تایید کرد که این اتاق را می خواهد رزرو کند باید شماره اتاق ها و شماره ای دی هتل را به لینک قفل اتاق بفرستید (اند پوینت شماره ۱) سپس به صفحه بعدی برود کاربر و تایید کند که اتاق با این مشخصات با این تاریخ با این قیمت را می خواهد و در این صفحه در انتها متد پرداخت را تایید کند
+ اینکه انلاین است یا حضوری اگر انلاین را فشار داد باید قیمت نصف شود و گفته شود که بقیه را به صورت حض.ری باید تسویه کند و اگر بگوید که می خواهد انلاین تسویه کند قیمت نهایی همان قیمت اصلی است
+پس از اینکه در این صفحه اطلاعات را تایید و تکمیل کرد برود صفحه بعد و در صفحه بعد به صورت نمادین بک صفحه پرداخت باشد و اصلا مهم نیست که کاربر چه اطلاعاتی میفرستد بعد از آن تمام اطلاعات تا اینحارا به اندپوینت ۳ که ایجاد رزرو است بفرستید . اگر در هر مرحله ایی کاربر زد انصراف باید به اندوپینت شماره ۲ درخواست بدبد تا اتاق از قفلی در بیاید و ازاد شود برای بقیه کاربرها
+
+
+
+
+1.lock room
+url = /reservation-api/lock-rooms/
+method = POST
+data = {'room_numbers': ['101', '102']
+         ,'hotel_id':'1'}
+
+
+2.unlock room
+url = /reservation-api/unlock-rooms/
+method = POST
+data = {'room_numbers': [101, 102]}
+
+
+3.create reservation
+url = /reservation-api/reserve/
+method =POST
+data = {
+            'room_number': 102,
+            'check_in_date': (timezone.now() + timedelta(days=1)).date().isoformat(),
+            'check_out_date': (timezone.now() + timedelta(days=3)).date().isoformat(),
+            'amount': 300,
+            'method': 'online'
+        }
+
+
+4.get all hotel reservations for hotel manager is usable
+url = /reservation-api/all-hotel-reservations/
+method = GET
+
+
+5.get all reservations for customer
+url = /reservation-api/reservation/
+method = GET
+
+

@@ -1,17 +1,11 @@
 from django.urls import path
-from . import views
+from .views import review_list_create, review_detail, hotel_review_stats, user_hotel_review
 
-app_name = 'reviews'
+app_name = 'review'
 
 urlpatterns = [
-    path('hotel/<int:hotel_id>/', views.ReviewListCreateView.as_view(), name='hotel-reviews'),
-    
-    # Get hotel review statistics
-    path('hotel/<int:hotel_id>/stats/', views.hotel_review_stats, name='hotel-review-stats'),
-    
-    # Get current user's review for a hotel
-    path('hotel/<int:hotel_id>/my-review/', views.user_hotel_review, name='user-hotel-review'),
-    
-    # Update/delete a specific review
-    path('<int:pk>/', views.ReviewDetailView.as_view(), name='review-detail'),
+    path('hotels/<int:hotel_id>/', review_list_create, name='review-list-create'),
+    path('review/<int:pk>/', review_detail, name='review-detail'),
+    path('hotels/<int:hotel_id>/stats/', hotel_review_stats, name='hotel-review-stats'),
+    path('hotels/<int:hotel_id>/user/', user_hotel_review, name='user-hotel-review'),
 ]
