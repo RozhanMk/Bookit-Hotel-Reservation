@@ -53,6 +53,9 @@ This repository contains the backend implementation of our hotel management syst
    ```
    docker-compose up --build
    ```
+4. For using APIs check out *http://localhost:8000/swagger/*
+
+   You can use the APIs with postman or the swagger interface.
 
 ## UML Diagram
 <img width="862" height="866" alt="UML Diagram" src="https://github.com/user-attachments/assets/82ba850f-6d10-42f0-9047-f4ef6071bdac" />
